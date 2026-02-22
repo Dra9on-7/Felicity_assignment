@@ -121,7 +121,7 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(cors({
-  origin: true,  // Reflect the request origin — allows any origin with credentials
+  origin: ['https://felicity-assignment.vercel.app/'],  // Reflect the request origin — allows any origin with credentials
   credentials: true
 }));
 app.use(express.json());

@@ -1,5 +1,5 @@
 import axios from 'axios';
-
+VITE_API_URL='http://localhost:5000/api'
 // Use the browser's current hostname so the API works from any device on the network
 const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000/api`;
 
