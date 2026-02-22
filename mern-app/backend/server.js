@@ -19,7 +19,7 @@ const server = http.createServer(app);
 // Socket.IO setup for real-time discussion forum
 const io = new Server(server, {
   cors: {
-    origin: true,
+    origin: ['https://felicity-assignment.vercel.app', 'http://localhost:5173', 'http://localhost:5174'],
     credentials: true,
   },
 });
@@ -121,7 +121,7 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(cors({
-  origin: ['https://felicity-assignment.vercel.app/'],  // Reflect the request origin — allows any origin with credentials
+  origin: ['https://felicity-assignment.vercel.app', 'http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 app.use(express.json());

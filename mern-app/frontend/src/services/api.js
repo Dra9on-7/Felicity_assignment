@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-// Use the browser's current hostname so the API works from any device on the network
-const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000/api`;
+// Backend base (without /api) — used by Socket.IO and image URLs
+export const API_HOST = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+  : `http://${window.location.hostname}:5000`;
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_HOST}/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

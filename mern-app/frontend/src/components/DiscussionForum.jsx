@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { forumAPI } from '../services/api';
+import { forumAPI, API_HOST } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-
-const API_HOST = `http://${window.location.hostname}:5000`;
 
 /**
  * Discussion Forum Component (Tier B Feature)

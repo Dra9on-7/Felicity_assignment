@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import { organizerAPI } from '../services/api';
-
-const API_HOST = `http://${window.location.hostname}:5000`;
+import { organizerAPI, API_HOST } from '../services/api';
 
 /**
  * Merchandise Orders Component (Tier A Feature)
