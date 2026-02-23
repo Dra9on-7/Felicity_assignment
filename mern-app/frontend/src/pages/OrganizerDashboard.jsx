@@ -11,6 +11,7 @@ const OrganizerDashboard = () => {
   const [ongoingEvents, setOngoingEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [carouselTab, setCarouselTab] = useState('all');
 
   useEffect(() => {
     fetchDashboardData();
@@ -24,7 +25,6 @@ const OrganizerDashboard = () => {
         organizerAPI.getOngoingEvents(),
       ]);
       
-      // API returns { events, analytics } at top level
       setEvents(dashboardRes.data.events || []);
       setAnalytics(dashboardRes.data.analytics || {});
       setOngoingEvents(ongoingRes.data.events || []);
@@ -47,6 +47,23 @@ const OrganizerDashboard = () => {
 
   const getEventName = (event) => event.name || event.eventName || 'Unnamed Event';
   const getStartDate = (event) => event.startDateTime || event.eventStartDate;
+
+  // Carousel filtering
+  const filteredEvents = carouselTab === 'all' ? events : events.filter(e => {
+    if (carouselTab === 'draft') return e.status === 'draft';
+    if (carouselTab === 'published') return e.status === 'published';
+    if (carouselTab === 'ongoing') return e.status === 'ongoing';
+    if (carouselTab === 'closed') return e.status === 'completed' || e.status === 'cancelled';
+    return true;
+  });
+
+  const statusCounts = {
+    all: events.length,
+    draft: events.filter(e => e.status === 'draft').length,
+    published: events.filter(e => e.status === 'published').length,
+    ongoing: events.filter(e => e.status === 'ongoing').length,
+    closed: events.filter(e => e.status === 'completed' || e.status === 'cancelled').length,
+  };
 
   if (loading) {
     return (
@@ -92,12 +109,24 @@ const OrganizerDashboard = () => {
           <h3>{analytics.totalRegistrations || 0}</h3>
           <p>Total Registrations</p>
         </div>
+        <div className="stat-card">
+          <h3>₹{analytics.totalRevenue || 0}</h3>
+          <p>Total Revenue</p>
+        </div>
+        <div className="stat-card">
+          <h3>{analytics.merchandiseSales || 0}</h3>
+          <p>Merchandise Sales</p>
+        </div>
+        <div className="stat-card">
+          <h3>{analytics.attendedCount || 0}</h3>
+          <p>Total Attendance</p>
+        </div>
       </div>
 
       {ongoingEvents.length > 0 && (
         <div className="dashboard-section">
           <div className="section-header">
-            <h2>Ongoing Events</h2>
+            <h2>🔴 Ongoing Events</h2>
           </div>
           
           <div className="events-table-container">
@@ -136,14 +165,26 @@ const OrganizerDashboard = () => {
         </div>
       )}
 
-      {/* Events Carousel - All Events */}
+      {/* Events Carousel with Status Tabs */}
       <div className="dashboard-section">
         <div className="section-header">
           <h2>Your Events</h2>
           <Link to="/organizer/events/create" className="view-all-link">+ Create New</Link>
         </div>
+
+        <div className="events-tabs" style={{ marginBottom: '16px' }}>
+          {['all', 'draft', 'published', 'ongoing', 'closed'].map(tab => (
+            <button
+              key={tab}
+              className={`tab-btn ${carouselTab === tab ? 'active' : ''}`}
+              onClick={() => setCarouselTab(tab)}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)} ({statusCounts[tab]})
+            </button>
+          ))}
+        </div>
         
-        {events.length > 0 ? (
+        {filteredEvents.length > 0 ? (
           <div className="events-table-container">
             <table className="events-table">
               <thead>
@@ -156,7 +197,7 @@ const OrganizerDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {events.slice(0, 10).map(event => (
+                {filteredEvents.map(event => (
                   <tr key={event._id}>
                     <td>{getEventName(event)}</td>
                     <td>
@@ -184,7 +225,9 @@ const OrganizerDashboard = () => {
             </table>
           </div>
         ) : (
-          <p className="empty-message">No events yet. Create your first event!</p>
+          <p className="empty-message">
+            {carouselTab === 'all' ? 'No events yet. Create your first event!' : `No ${carouselTab} events.`}
+          </p>
         )}
       </div>
 

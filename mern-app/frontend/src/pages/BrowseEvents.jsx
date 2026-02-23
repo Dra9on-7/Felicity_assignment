@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { eventAPI } from '../services/api';
+import { eventAPI, participantAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import EventCard from '../components/EventCard';
 import '../styles/Events.css';
 
 const BrowseEvents = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAuthenticated, isParticipant } = useAuth();
   const [events, setEvents] = useState([]);
   const [categories, setCategories] = useState([]);
   const [organizers, setOrganizers] = useState([]);
@@ -17,6 +19,10 @@ const BrowseEvents = () => {
     category: searchParams.get('category') || '',
     eventType: searchParams.get('eventType') || '',
     organizer: searchParams.get('organizer') || '',
+    eligibility: searchParams.get('eligibility') || '',
+    startDate: searchParams.get('startDate') || '',
+    endDate: searchParams.get('endDate') || '',
+    followedOnly: searchParams.get('followedOnly') || '',
     sortBy: searchParams.get('sortBy') || 'startDateTime',
     sortOrder: searchParams.get('sortOrder') || 'asc',
   });
@@ -75,6 +81,10 @@ const BrowseEvents = () => {
       category: '',
       eventType: '',
       organizer: '',
+      eligibility: '',
+      startDate: '',
+      endDate: '',
+      followedOnly: '',
       sortBy: 'startDateTime',
       sortOrder: 'asc',
     });
@@ -150,6 +160,50 @@ const BrowseEvents = () => {
               ))}
             </select>
           </div>
+
+          <div className="filter-group">
+            <label>Eligibility</label>
+            <select
+              value={filters.eligibility}
+              onChange={(e) => handleFilterChange('eligibility', e.target.value)}
+            >
+              <option value="">All</option>
+              <option value="all">Open to All</option>
+              <option value="iiit">IIIT Only</option>
+              <option value="non-iiit">Non-IIIT Only</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label>Start Date (From)</label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => handleFilterChange('startDate', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-group">
+            <label>Start Date (To)</label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => handleFilterChange('endDate', e.target.value)}
+            />
+          </div>
+
+          {isAuthenticated && isParticipant && (
+            <div className="filter-group">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={filters.followedOnly === 'true'}
+                  onChange={(e) => handleFilterChange('followedOnly', e.target.checked ? 'true' : '')}
+                />
+                {' '}Followed Clubs Only
+              </label>
+            </div>
+          )}
 
           <div className="filter-group">
             <label>Sort By</label>

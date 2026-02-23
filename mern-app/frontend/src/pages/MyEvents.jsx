@@ -5,6 +5,7 @@ import '../styles/Events.css';
 
 const MyEvents = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [subFilter, setSubFilter] = useState('all'); // 'all', 'normal', 'merchandise'
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,15 +31,28 @@ const MyEvents = () => {
   
   const upcomingEvents = registrations.filter(reg => {
     const eventDate = new Date(reg.event?.eventStartDate);
-    return eventDate > now && reg.status !== 'cancelled';
+    return eventDate > now && reg.status !== 'cancelled' && reg.status !== 'rejected';
   });
 
-  const pastEvents = registrations.filter(reg => {
-    const eventDate = new Date(reg.event?.eventEndDate || reg.event?.eventStartDate);
-    return eventDate < now;
+  const completedEvents = registrations.filter(reg => {
+    const eventEndDate = new Date(reg.event?.eventEndDate || reg.event?.eventStartDate);
+    return (eventEndDate < now || reg.event?.status === 'completed') && 
+           reg.status !== 'cancelled' && reg.status !== 'rejected';
   });
 
   const cancelledEvents = registrations.filter(reg => reg.status === 'cancelled');
+
+  const rejectedEvents = registrations.filter(reg => 
+    reg.paymentStatus === 'rejected' || reg.status === 'rejected'
+  );
+
+  const applySubFilter = (events) => {
+    if (subFilter === 'all') return events;
+    return events.filter(reg => {
+      const type = reg.event?.eventType || 'normal';
+      return type === subFilter;
+    });
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBA';
@@ -67,29 +81,49 @@ const MyEvents = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (registration) => {
+    const { status, paymentStatus } = registration;
+    if (paymentStatus === 'rejected') return { class: 'badge-danger', text: 'Payment Rejected' };
+    if (paymentStatus === 'pending_approval') return { class: 'badge-warning', text: 'Pending Approval' };
+    if (paymentStatus === 'approved') return { class: 'badge-success', text: 'Approved' };
     const badges = {
       registered: { class: 'badge-success', text: 'Registered' },
       attended: { class: 'badge-info', text: 'Attended' },
       cancelled: { class: 'badge-warning', text: 'Cancelled' },
+      pending: { class: 'badge-warning', text: 'Pending' },
     };
     return badges[status] || { class: '', text: status };
   };
 
   const renderEventCard = (registration, showCancel = false) => {
-    const { event, status, ticket } = registration;
+    const { event, status, ticket, ticketId } = registration;
     if (!event) return null;
 
-    const badge = getStatusBadge(status);
+    const badge = getStatusBadge(registration);
+    const eventType = event.eventType || 'normal';
 
     return (
       <div key={registration._id} className="my-event-card">
         <div className="event-card-header">
           <Link to={`/events/${event._id}`} className="event-title-link">
-            <h3>{event.eventName}</h3>
+            <h3>{event.eventName || event.name}</h3>
           </Link>
-          <span className={`status-badge ${badge.class}`}>{badge.text}</span>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <span className={`event-type-badge ${eventType}`}>
+              {eventType === 'merchandise' ? '🛍️ Merchandise' : '🎫 Normal'}
+            </span>
+            <span className={`status-badge ${badge.class}`}>{badge.text}</span>
+          </div>
         </div>
+
+        {ticketId && (
+          <div className="ticket-id-display" style={{ 
+            background: '#f0f4ff', padding: '6px 12px', borderRadius: '6px', 
+            fontSize: '0.85em', marginBottom: '8px', fontFamily: 'monospace' 
+          }}>
+            🎟️ Ticket ID: <strong>{ticketId}</strong>
+          </div>
+        )}
 
         <div className="event-meta-info">
           <p>
@@ -108,25 +142,28 @@ const MyEvents = () => {
           </p>
         </div>
 
-        {event.eventType === 'merchandise' && registration.registrationData?.variant && (
-          <div className="merchandise-details">
-            <p><strong>Variant:</strong> {registration.registrationData.variant}</p>
-            {registration.registrationData.quantity && (
-              <p><strong>Quantity:</strong> {registration.registrationData.quantity}</p>
-            )}
+        {eventType === 'merchandise' && registration.merchandiseDetails && (
+          <div className="merchandise-details" style={{ 
+            background: '#fff7ed', padding: '8px 12px', borderRadius: '6px', marginBottom: '8px' 
+          }}>
+            {(Array.isArray(registration.merchandiseDetails) ? registration.merchandiseDetails : [registration.merchandiseDetails]).map((item, idx) => (
+              <p key={idx}>
+                <strong>{item.name || item.itemName}</strong>
+                {item.variant && ` — ${item.variant}`}
+                {item.quantity && ` × ${item.quantity}`}
+                {item.price && ` — ₹${item.price * (item.quantity || 1)}`}
+              </p>
+            ))}
           </div>
         )}
 
-        {ticket?.qrCode && status === 'registered' && (
+        {(registration.qrCode || ticket?.qrCode) && (status === 'registered' || status === 'attended') && (
           <div className="ticket-section">
             <h4>Your Ticket</h4>
             <div className="qr-code-container">
-              <img src={ticket.qrCode} alt="QR Code Ticket" className="qr-code-image" />
+              <img src={registration.qrCode || ticket?.qrCode} alt="QR Code Ticket" className="qr-code-image" />
             </div>
             <p className="ticket-info">Show this QR code at the venue for entry</p>
-            {ticket.issuedAt && (
-              <p className="ticket-issued">Issued: {formatDate(ticket.issuedAt)}</p>
-            )}
           </div>
         )}
 
@@ -163,6 +200,13 @@ const MyEvents = () => {
     );
   }
 
+  const currentEvents = activeTab === 'upcoming' ? upcomingEvents 
+    : activeTab === 'completed' ? completedEvents 
+    : activeTab === 'cancelled' ? cancelledEvents 
+    : rejectedEvents;
+
+  const filteredEvents = applySubFilter(currentEvents);
+
   return (
     <div className="my-events-container">
       <div className="page-header">
@@ -178,10 +222,10 @@ const MyEvents = () => {
           Upcoming ({upcomingEvents.length})
         </button>
         <button 
-          className={`tab-btn ${activeTab === 'past' ? 'active' : ''}`}
-          onClick={() => setActiveTab('past')}
+          className={`tab-btn ${activeTab === 'completed' ? 'active' : ''}`}
+          onClick={() => setActiveTab('completed')}
         >
-          Past ({pastEvents.length})
+          Completed ({completedEvents.length})
         </button>
         <button 
           className={`tab-btn ${activeTab === 'cancelled' ? 'active' : ''}`}
@@ -189,47 +233,49 @@ const MyEvents = () => {
         >
           Cancelled ({cancelledEvents.length})
         </button>
+        <button 
+          className={`tab-btn ${activeTab === 'rejected' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rejected')}
+        >
+          Rejected ({rejectedEvents.length})
+        </button>
+      </div>
+
+      {/* Sub-filter by event type */}
+      <div className="events-sub-filter" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        {['all', 'normal', 'merchandise'].map(f => (
+          <button 
+            key={f}
+            className={`btn-sm ${subFilter === f ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSubFilter(f)}
+            style={{ padding: '4px 12px', borderRadius: '16px', fontSize: '0.85em' }}
+          >
+            {f === 'all' ? 'All Types' : f === 'normal' ? '🎫 Normal' : '🛍️ Merchandise'}
+          </button>
+        ))}
       </div>
 
       <div className="events-content">
-        {activeTab === 'upcoming' && (
-          upcomingEvents.length > 0 ? (
-            <div className="my-events-grid">
-              {upcomingEvents.map(reg => renderEventCard(reg, true))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <h3>No upcoming events</h3>
-              <p>You haven't registered for any upcoming events yet.</p>
+        {filteredEvents.length > 0 ? (
+          <div className="my-events-grid">
+            {filteredEvents.map(reg => renderEventCard(reg, activeTab === 'upcoming'))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <h3>No {activeTab} events</h3>
+            <p>
+              {activeTab === 'upcoming' 
+                ? "You haven't registered for any upcoming events yet." 
+                : activeTab === 'completed'
+                  ? 'Your completed event history will appear here.'
+                  : activeTab === 'cancelled'
+                    ? "You haven't cancelled any event registrations."
+                    : 'No rejected registrations.'}
+            </p>
+            {activeTab === 'upcoming' && (
               <Link to="/events" className="btn-primary">Browse Events</Link>
-            </div>
-          )
-        )}
-
-        {activeTab === 'past' && (
-          pastEvents.length > 0 ? (
-            <div className="my-events-grid">
-              {pastEvents.map(reg => renderEventCard(reg))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <h3>No past events</h3>
-              <p>Your event history will appear here.</p>
-            </div>
-          )
-        )}
-
-        {activeTab === 'cancelled' && (
-          cancelledEvents.length > 0 ? (
-            <div className="my-events-grid">
-              {cancelledEvents.map(reg => renderEventCard(reg))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <h3>No cancelled registrations</h3>
-              <p>You haven't cancelled any event registrations.</p>
-            </div>
-          )
+            )}
+          </div>
         )}
       </div>
     </div>

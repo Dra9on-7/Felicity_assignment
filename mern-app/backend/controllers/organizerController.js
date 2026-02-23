@@ -2,6 +2,7 @@ const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const Management = require('../models/Management');
 const { sendEventCreatedEmail, sendEventPublishedEmail, sendEventCancelledToParticipants, sendEventEndedEarlyEmail } = require('../utils/emailService');
+const { notifyEventPublished } = require('../utils/discordWebhook');
 
 /**
  * Organizer Controller
@@ -17,17 +18,34 @@ exports.getDashboard = async (req, res) => {
         const events = await Event.find({ organizerId }).sort({ createdAt: -1 });
         
         // Calculate analytics
-        const publishedEvents = events.filter(e => e.status === 'published').length;
+        const publishedEvents = events.filter(e => e.status === 'published' || e.status === 'ongoing').length;
         const draftEvents = events.filter(e => e.status === 'draft').length;
-        const upcomingEvents = events.filter(e => new Date(e.eventStartDate) > new Date()).length;
+        const upcomingEvents = events.filter(e => 
+            (e.status === 'published' || e.status === 'ongoing') && new Date(e.eventStartDate) > new Date()
+        ).length;
         const ongoingEvents = events.filter(e => {
             const now = new Date();
-            return new Date(e.eventStartDate) <= now && new Date(e.eventEndDate) >= now;
+            return (e.status === 'published' || e.status === 'ongoing') && 
+                   new Date(e.eventStartDate) <= now && new Date(e.eventEndDate) >= now;
         });
 
         // Total registrations across all events
         const eventIds = events.map(e => e._id);
-        const totalRegistrations = await Registration.countDocuments({ eventId: { $in: eventIds } });
+        const allRegistrations = await Registration.find({ eventId: { $in: eventIds } });
+        const totalRegistrations = allRegistrations.length;
+
+        // Revenue calculation (sum of paymentAmount for approved payments)
+        const totalRevenue = allRegistrations
+            .filter(r => r.paymentStatus === 'approved' || r.status === 'registered')
+            .reduce((sum, r) => sum + (r.paymentAmount || 0), 0);
+
+        // Merchandise sales count
+        const merchandiseSales = allRegistrations
+            .filter(r => r.merchandiseDetails && r.merchandiseDetails.length > 0 && r.paymentStatus === 'approved')
+            .length;
+
+        // Attendance stats
+        const attendedCount = allRegistrations.filter(r => r.attendedAt || r.status === 'attended').length;
 
         return res.status(200).json({
             events,
@@ -37,7 +55,10 @@ exports.getDashboard = async (req, res) => {
                 draftEvents,
                 upcomingEvents,
                 ongoingEvents: ongoingEvents.length,
-                totalRegistrations
+                totalRegistrations,
+                totalRevenue,
+                merchandiseSales,
+                attendedCount
             }
         });
     } catch (error) {
@@ -52,9 +73,12 @@ exports.getOngoingEvents = async (req, res) => {
         const organizerId = req.user._id;
         const now = new Date();
 
+        // Match events that are actively happening:
+        // - status 'ongoing' (auto-transitioned by cron), OR
+        // - status 'published' with start date passed and end date not yet passed
         const events = await Event.find({
             organizerId,
-            status: 'published',
+            status: { $in: ['published', 'ongoing'] },
             eventStartDate: { $lte: now },
             eventEndDate: { $gte: now }
         });
@@ -218,6 +242,16 @@ exports.updateEvent = async (req, res) => {
             }
         }
 
+        // Form Locking: prevent editing registration form after first registration
+        if (updates.customFormFields || updates.registrationFormFields) {
+            const existingRegistrations = await Registration.countDocuments({ event: eventId });
+            if (existingRegistrations > 0) {
+                return res.status(400).json({
+                    message: 'Cannot modify registration form after participants have registered. Form is locked.'
+                });
+            }
+        }
+
         // Apply allowed updates
         const allowedUpdates = [
             'eventName', 'eventDescription', 'eligibility', 
@@ -284,6 +318,16 @@ exports.publishEvent = async (req, res) => {
                 eventStartDate: event.eventStartDate,
             }).catch(err => console.error('Failed to send event published email:', err.message));
         }
+
+        // Send Discord webhook notification for new event published
+        notifyEventPublished({
+            organizerId,
+            eventName: event.eventName || event.name,
+            eventType: event.eventType,
+            startDate: event.eventStartDate,
+            venue: event.venue,
+            description: event.eventDescription || event.description,
+        }).catch(err => console.error('Discord publish notification failed:', err.message));
 
         return res.status(200).json({ 
             message: 'Event published successfully',

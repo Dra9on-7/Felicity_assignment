@@ -22,6 +22,7 @@ router.delete('/organizers/:organizerId', auth, adminOnly, adminController.delet
 // Password reset management
 router.get('/password-reset-requests', auth, adminOnly, adminController.getPasswordResetRequests);
 router.post('/organizers/:organizerId/reset-password', auth, adminOnly, adminController.resetOrganizerPassword);
+router.get('/generate-password', auth, adminOnly, adminController.generatePassword);
 
 // View all participants
 router.get('/participants', auth, adminOnly, adminController.getAllParticipants);

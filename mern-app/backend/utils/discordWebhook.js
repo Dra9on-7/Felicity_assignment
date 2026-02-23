@@ -129,9 +129,38 @@ const notifyEventStarting = async ({ organizerId, eventName, startDate, venue })
     }
 };
 
+/**
+ * Notify organizer's Discord when a new event is published
+ */
+const notifyEventPublished = async ({ organizerId, eventName, eventType, startDate, venue, description }) => {
+    try {
+        const organizer = await Management.findById(organizerId);
+        if (!organizer?.discordWebhookUrl) {
+            return null;
+        }
+
+        return sendDiscordMessage(organizer.discordWebhookUrl, {
+            title: `🎉 New Event Published: ${eventName}`,
+            description: description ? description.substring(0, 200) + '...' : 'A new event has been published!',
+            color: COLORS.info,
+            fields: [
+                { name: '🎫 Type', value: eventType || 'normal', inline: true },
+                { name: '📅 Start Date', value: startDate ? new Date(startDate).toLocaleString() : 'TBD', inline: true },
+                { name: '📍 Venue', value: venue || 'TBD', inline: true },
+            ],
+            timestamp: new Date().toISOString(),
+            footer: { text: 'Felicity Event Management System' },
+        });
+    } catch (error) {
+        console.error('Discord notify event published error:', error.message);
+        return null;
+    }
+};
+
 module.exports = {
     sendDiscordMessage,
     notifyNewRegistration,
     notifyRegistrationCancelled,
     notifyEventStarting,
+    notifyEventPublished,
 };

@@ -37,12 +37,28 @@ function App() {
           <Navbar />
           <main className="main-content">
             <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Navigate to="/events" replace />} />
-              <Route path="/events" element={<BrowseEvents />} />
-              <Route path="/events/:eventId" element={<EventDetails />} />
-              <Route path="/clubs" element={<Clubs />} />
-              <Route path="/clubs/:clubId" element={<ClubDetails />} />
+              {/* Public Routes - require authentication */}
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/events" element={
+                <ProtectedRoute roles={['participant', 'organizer', 'admin']}>
+                  <BrowseEvents />
+                </ProtectedRoute>
+              } />
+              <Route path="/events/:eventId" element={
+                <ProtectedRoute roles={['participant', 'organizer', 'admin']}>
+                  <EventDetails />
+                </ProtectedRoute>
+              } />
+              <Route path="/clubs" element={
+                <ProtectedRoute roles={['participant', 'organizer', 'admin']}>
+                  <Clubs />
+                </ProtectedRoute>
+              } />
+              <Route path="/clubs/:clubId" element={
+                <ProtectedRoute roles={['participant', 'organizer', 'admin']}>
+                  <ClubDetails />
+                </ProtectedRoute>
+              } />
               
               {/* Auth Routes (public only - redirect if logged in) */}
               <Route 
@@ -181,7 +197,7 @@ function App() {
               />
 
               {/* Catch-all redirect */}
-              <Route path="*" element={<Navigate to="/events" replace />} />
+              <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </main>
         </div>

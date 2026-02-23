@@ -33,11 +33,13 @@ router.get('/events/:eventId/analytics', auth, organizerOnly, organizerControlle
 // Profile
 router.get('/profile', auth, organizerOnly, organizerController.getProfile);
 router.put('/profile', auth, organizerOnly, organizerController.updateProfile);
-router.put('/change-password', auth, organizerOnly, organizerController.changePassword);
 
 // Webhook
 router.put('/webhook', auth, organizerOnly, organizerController.updateWebhookSettings);
 router.post('/webhook/test', auth, organizerOnly, organizerController.testWebhook);
+
+// Change password
+router.put('/change-password', auth, organizerOnly, organizerController.changePassword);
 
 // Password reset request
 router.post('/request-password-reset', auth, organizerOnly, organizerController.requestPasswordReset);

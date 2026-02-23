@@ -112,7 +112,6 @@ export const organizerAPI = {
   // Profile
   getProfile: () => api.get('/organizer/profile'),
   updateProfile: (data) => api.put('/organizer/profile', data),
-  changePassword: (data) => api.put('/organizer/change-password', data),
   
   // Webhook
   updateWebhookSettings: (data) => api.put('/organizer/webhook', data),
@@ -151,6 +150,7 @@ export const adminAPI = {
   getPasswordResetRequests: () => api.get('/admin/password-reset-requests'),
   resetOrganizerPassword: (organizerId, newPassword) => 
     api.post(`/admin/organizers/${organizerId}/reset-password`, { newPassword }),
+  generatePassword: () => api.get('/admin/generate-password'),
   
   // View all
   getAllParticipants: () => api.get('/admin/participants'),

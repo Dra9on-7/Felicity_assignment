@@ -125,12 +125,30 @@ exports.approvePayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found or not pending approval' });
     }
 
+    // Decrement stock upon approval
+    if (registration.merchandiseDetails && registration.merchandiseDetails.length > 0) {
+      for (const detail of registration.merchandiseDetails) {
+        const item = event.merchandiseItems.id(detail.itemId);
+        if (item) {
+          if (item.stock < (detail.quantity || 1)) {
+            return res.status(400).json({
+              success: false,
+              message: `Not enough stock for ${item.name}. Available: ${item.stock}`
+            });
+          }
+          item.stock -= (detail.quantity || 1);
+        }
+      }
+      await event.save();
+    }
+
     // Generate QR code now that payment is approved
     const registrationData = {
       eventId,
       eventName: event.name || event.eventName,
       participantId: registration.participant,
       registrationId: registration._id,
+      ticketId: registration.ticketId,
       approvedAt: new Date(),
     };
     const qrCode = await QRCode.toDataURL(JSON.stringify(registrationData));

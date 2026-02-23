@@ -275,9 +275,8 @@ exports.resetOrganizerPassword = async (req, res) => {
         const { organizerId } = req.params;
         const { newPassword } = req.body;
 
-        if (!newPassword) {
-            return res.status(400).json({ message: 'New password is required' });
-        }
+        // Auto-generate password if not provided
+        const passwordToSet = newPassword || generateRandomPassword();
 
         const organizer = await Management.findById(organizerId);
         if (!organizer || organizer.role !== 'organizer') {
@@ -285,15 +284,38 @@ exports.resetOrganizerPassword = async (req, res) => {
         }
 
         const salt = await bcrypt.genSalt(10);
-        organizer.password = await bcrypt.hash(newPassword, salt);
+        organizer.password = await bcrypt.hash(passwordToSet, salt);
         organizer.passwordResetRequested = false;
         organizer.passwordResetRequestedAt = undefined;
 
         await organizer.save();
 
-        return res.status(200).json({ message: 'Password reset successfully' });
+        return res.status(200).json({ 
+            message: 'Password reset successfully',
+            generatedPassword: !newPassword ? passwordToSet : undefined
+        });
     } catch (error) {
         console.error('Error resetting password:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Generate a random secure password
+function generateRandomPassword(length = 12) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+}
+
+// Generate random password API endpoint
+exports.generatePassword = async (req, res) => {
+    try {
+        const password = generateRandomPassword();
+        return res.status(200).json({ password });
+    } catch (error) {
         return res.status(500).json({ message: 'Server error' });
     }
 };

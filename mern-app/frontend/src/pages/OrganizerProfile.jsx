@@ -33,12 +33,6 @@ const OrganizerProfile = () => {
     notifyOnEventStart: true
   });
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-
   const categories = EVENT_CATEGORIES;
 
   useEffect(() => {
@@ -107,14 +101,6 @@ const OrganizerProfile = () => {
     }));
   };
 
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     try {
@@ -167,31 +153,19 @@ const OrganizerProfile = () => {
     }
   };
 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setMessage({ type: 'error', text: 'New passwords do not match' });
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+  const handleRequestPasswordReset = async () => {
+    if (!window.confirm('Are you sure you want to request a password reset? The admin will review and process your request.')) {
       return;
     }
 
     try {
       setSaving(true);
-      await organizerAPI.changePassword({
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword
-      });
-      setMessage({ type: 'success', text: 'Password changed successfully!' });
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      await organizerAPI.requestPasswordReset();
+      setMessage({ type: 'success', text: 'Password reset request submitted successfully! The admin will process your request.' });
     } catch (err) {
       setMessage({ 
         type: 'error', 
-        text: err.response?.data?.message || 'Failed to change password' 
+        text: err.response?.data?.message || 'Failed to submit password reset request' 
       });
     } finally {
       setSaving(false);
@@ -460,50 +434,26 @@ const OrganizerProfile = () => {
         )}
 
         {activeTab === 'security' && (
-          <form onSubmit={handleChangePassword} className="profile-form">
+          <div className="profile-form">
             <div className="form-section">
-              <h3>Change Password</h3>
+              <h3>Password Management</h3>
+              <p style={{ color: '#666', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+                For security reasons, organizer password changes are handled by the system administrator. 
+                To reset your password, submit a request below. The admin will review and process it.
+              </p>
               
-              <div className="form-group">
-                <label>Current Password</label>
-                <input
-                  type="password"
-                  name="currentPassword"
-                  value={passwordData.currentPassword}
-                  onChange={handlePasswordChange}
-                  placeholder="Enter current password"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>New Password</label>
-                <input
-                  type="password"
-                  name="newPassword"
-                  value={passwordData.newPassword}
-                  onChange={handlePasswordChange}
-                  placeholder="Enter new password"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Confirm New Password</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={passwordData.confirmPassword}
-                  onChange={handlePasswordChange}
-                  placeholder="Confirm new password"
-                />
+              <div className="form-actions">
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  disabled={saving}
+                  onClick={handleRequestPasswordReset}
+                >
+                  {saving ? 'Submitting...' : '🔒 Request Password Reset'}
+                </button>
               </div>
             </div>
-
-            <div className="form-actions">
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Changing...' : 'Change Password'}
-              </button>
-            </div>
-          </form>
+          </div>
         )}
       </div>
     </div>

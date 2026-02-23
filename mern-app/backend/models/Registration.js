@@ -1,6 +1,16 @@
 const mongoose = require('mongoose');
 
+// Counter schema for sequential ticket IDs
+const counterSchema = new mongoose.Schema({
+  _id: String,
+  seq: { type: Number, default: 0 }
+});
+const Counter = mongoose.models.Counter || mongoose.model('Counter', counterSchema, 'counters');
+
 const registrationSchema = new mongoose.Schema({
+  // Unique human-readable Ticket ID
+  ticketId: { type: String, unique: true, sparse: true },
+
   // Support both naming conventions
   participant: {
     type: mongoose.Schema.Types.ObjectId,
@@ -76,8 +86,22 @@ const registrationSchema = new mongoose.Schema({
   registeredAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-// Pre-save: sync field names
-registrationSchema.pre('save', function(next) {
+// Pre-save: auto-generate ticketId if not set
+registrationSchema.pre('save', async function(next) {
+  if (!this.ticketId) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        'ticketId',
+        { $inc: { seq: 1 } },
+        { upsert: true, new: true }
+      );
+      const year = new Date().getFullYear();
+      this.ticketId = `FEL-${year}-${String(counter.seq).padStart(5, '0')}`;
+    } catch (err) {
+      console.error('Error generating ticketId:', err);
+    }
+  }
+
   if (this.participantId && !this.participant) this.participant = this.participantId;
   if (this.participant && !this.participantId) this.participantId = this.participant;
   

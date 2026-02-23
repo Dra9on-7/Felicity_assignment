@@ -223,6 +223,14 @@ exports.registerForEvent = async (req, res) => {
             var eventToRegister = event;
         }
 
+        // Check registration deadline
+        if (eventToRegister.registrationDeadline && new Date() > new Date(eventToRegister.registrationDeadline)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Registration deadline has passed for this event'
+            });
+        }
+
         // Check eligibility
         if (eventToRegister.eligibility && eventToRegister.eligibility !== 'all') {
             const participant = await Management.findById(req.user._id);
@@ -294,9 +302,7 @@ exports.registerForEvent = async (req, res) => {
                 });
             }
 
-            // Update stock
-            item.stock -= quantity;
-            await eventToRegister.save();
+            // Stock will be decremented upon payment approval, not at registration time
 
             merchandiseDetails = {
                 itemId: merchandiseItemId,
@@ -319,21 +325,28 @@ exports.registerForEvent = async (req, res) => {
 
         // For merchandise events with payment, QR is generated only after approval
         const isMerchandise = eventToRegister.eventType === 'merchandise';
-        const qrCode = isMerchandise ? null : await QRCode.toDataURL(JSON.stringify(registrationData));
 
-        // Create registration
+        // Create registration first to get ticketId
         const registration = new Registration({
             participant: req.user._id,
             event: eventId,
             status: isMerchandise ? 'pending' : 'registered',
-            qrCode,
             merchandiseDetails,
             paymentStatus: isMerchandise ? 'pending_approval' : 'not_required',
             paymentAmount: merchandiseDetails ? merchandiseDetails.totalAmount : 0,
             registeredAt: new Date()
         });
 
-        await registration.save();
+        await registration.save(); // This triggers ticketId generation
+
+        // Now generate QR with ticketId included
+        registrationData.ticketId = registration.ticketId;
+        const qrCode = isMerchandise ? null : await QRCode.toDataURL(JSON.stringify(registrationData));
+
+        if (qrCode) {
+            registration.qrCode = qrCode;
+            await registration.save();
+        }
 
         // Send confirmation email (non-blocking)
         const participantName = req.user.firstName 
@@ -380,7 +393,7 @@ exports.cancelRegistration = async (req, res) => {
         const registration = await Registration.findOne({
             participant: req.user._id,
             event: eventId,
-            status: 'registered'
+            status: { $in: ['registered', 'pending'] }
         });
 
         if (!registration) {
@@ -390,15 +403,20 @@ exports.cancelRegistration = async (req, res) => {
             });
         }
 
-        // Restore merchandise stock if applicable
-        if (registration.merchandiseDetails) {
+        // Restore merchandise stock only if payment was approved (stock was decremented at approval)
+        if (registration.merchandiseDetails && registration.paymentStatus === 'approved') {
             const event = await Event.findById(eventId);
             if (event) {
-                const item = event.merchandiseItems.id(registration.merchandiseDetails.itemId);
-                if (item) {
-                    item.stock += registration.merchandiseDetails.quantity;
-                    await event.save();
+                const details = Array.isArray(registration.merchandiseDetails) 
+                    ? registration.merchandiseDetails 
+                    : [registration.merchandiseDetails];
+                for (const detail of details) {
+                    const item = event.merchandiseItems.id(detail.itemId);
+                    if (item) {
+                        item.stock += (detail.quantity || 1);
+                    }
                 }
+                await event.save();
             }
         }
 
