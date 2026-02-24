@@ -79,7 +79,7 @@ exports.getOngoingEvents = async (req, res) => {
         const events = await Event.find({
             organizerId,
             status: { $in: ['published', 'ongoing'] },
-            eventStartDate: { $lte: now },
+            // eventStartDate: { $lte: now },
             eventEndDate: { $gte: now }
         });
 
